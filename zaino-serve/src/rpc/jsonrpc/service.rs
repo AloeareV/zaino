@@ -254,188 +254,88 @@ pub trait ZcashIndexerRpc {
     ) -> Result<Vec<GetAddressUtxos>, ErrorObjectOwned>;
 }
 
-/// Uses ErrorCode::InvalidParams as this is converted to zcash legacy "minsc" ErrorCode in RPC middleware.
-#[jsonrpsee::core::async_trait]
-impl<Indexer: ZcashIndexer + LightWalletIndexer> ZcashIndexerRpcServer for JsonRpcClient<Indexer> {
-    async fn get_info(&self) -> Result<GetInfo, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .get_info()
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
-    }
+macro_rules! zcash_indexer_rpc_methods {
+    // Take the method declaration as input
+    ($(async fn $method:ident(&self$(, $arg:ident: $arg_type:ty)*$(,)?) -> $return_type:ty;)+) => {
+        $(
+            // Expand the signature, reimplementation of what the [async_trait} macro does
+            // as due to macto expansion order this is incompatible with async_trait
+            fn $method<'life0, 'async_trait>(&'life0 self$(, $arg: $arg_type)?)
+                -> std::pin::Pin<Box<dyn std::future::Future<Output = $return_type> + Send + 'async_trait>>
+                where
+                    Self: 'async_trait,
+                    'life0: 'async_trait
+            {
+                Box::pin(async move {
+                        self.service_subscriber
+                            .inner_ref()
+                            .$method($($arg,)*)
+                            .await
+                            .map_err(|e| {
+                                ErrorObjectOwned::owned(
+                                    ErrorCode::InvalidParams.code(),
+                                    "Internal server error",
+                                    Some(e.to_string()),
+                                )
+                            })
+                        }
+                    )
+            }
+        )+
+    };
+}
 
-    async fn get_blockchain_info(&self) -> Result<GetBlockChainInfo, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .get_blockchain_info()
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
-    }
+/// Uses ErrorCode::InvalidParams as this is converted to zcash legacy "minsc" ErrorCode in RPC middleware.
+impl<Indexer: ZcashIndexer + LightWalletIndexer> ZcashIndexerRpcServer for JsonRpcClient<Indexer> {
+    zcash_indexer_rpc_methods! {
+    async fn get_info(&self) -> Result<GetInfo, ErrorObjectOwned>;
+
+    async fn get_blockchain_info(&self) -> Result<GetBlockChainInfo, ErrorObjectOwned>;
 
     async fn z_get_address_balance(
         &self,
         address_strings: AddressStrings,
-    ) -> Result<AddressBalance, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .z_get_address_balance(address_strings)
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
-    }
+    ) -> Result<AddressBalance, ErrorObjectOwned>;
 
     async fn send_raw_transaction(
         &self,
         raw_transaction_hex: String,
-    ) -> Result<SentTransactionHash, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .send_raw_transaction(raw_transaction_hex)
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
-    }
+    ) -> Result<SentTransactionHash, ErrorObjectOwned>;
 
     async fn z_get_block(
         &self,
         hash_or_height: String,
         verbosity: Option<u8>,
-    ) -> Result<GetBlock, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .z_get_block(hash_or_height, verbosity)
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
-    }
+    ) -> Result<GetBlock, ErrorObjectOwned>;
 
-    async fn get_raw_mempool(&self) -> Result<Vec<String>, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .get_raw_mempool()
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
-    }
+    async fn get_raw_mempool(&self) -> Result<Vec<String>, ErrorObjectOwned>;
 
     async fn z_get_treestate(
         &self,
         hash_or_height: String,
-    ) -> Result<GetTreestate, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .z_get_treestate(hash_or_height)
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
-    }
+    ) -> Result<GetTreestate, ErrorObjectOwned>;
 
     async fn z_get_subtrees_by_index(
         &self,
         pool: String,
         start_index: NoteCommitmentSubtreeIndex,
         limit: Option<NoteCommitmentSubtreeIndex>,
-    ) -> Result<GetSubtrees, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .z_get_subtrees_by_index(pool, start_index, limit)
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
-    }
+    ) -> Result<GetSubtrees, ErrorObjectOwned>;
 
     async fn get_raw_transaction(
         &self,
         txid_hex: String,
         verbose: Option<u8>,
-    ) -> Result<GetRawTransaction, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .get_raw_transaction(txid_hex, verbose)
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
-    }
+    ) -> Result<GetRawTransaction, ErrorObjectOwned>;
 
     async fn get_address_tx_ids(
         &self,
         request: GetAddressTxIdsRequest,
-    ) -> Result<Vec<String>, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .get_address_tx_ids(request)
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
-    }
+    ) -> Result<Vec<String>, ErrorObjectOwned>;
 
     async fn z_get_address_utxos(
         &self,
         address_strings: AddressStrings,
-    ) -> Result<Vec<GetAddressUtxos>, ErrorObjectOwned> {
-        self.service_subscriber
-            .inner_ref()
-            .z_get_address_utxos(address_strings)
-            .await
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    ErrorCode::InvalidParams.code(),
-                    "Internal server error",
-                    Some(e.to_string()),
-                )
-            })
+    ) -> Result<Vec<GetAddressUtxos>, ErrorObjectOwned>;
     }
 }
